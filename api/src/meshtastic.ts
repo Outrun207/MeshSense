@@ -4,6 +4,8 @@
 
 // import { HttpConnection, BleConnection } from '@meshtastic/js'
 import { HttpConnection, BleConnection, Protobuf } from '../meshtastic-js/dist'
+import { NodeSerialConnection } from './lib/serialConnection'
+import { isSerialPath, listSerialPorts } from './lib/serial'
 import {
   Channel,
   MeshPacket,
@@ -36,7 +38,7 @@ import { State } from './lib/state'
 
 let routeCache: State<Record<number, number[]>>
 
-let connection: HttpConnection | BleConnection
+let connection: HttpConnection | BleConnection | NodeSerialConnection
 let connectionIntended = false
 // address.subscribe(connect)
 
@@ -221,6 +223,9 @@ export async function connect(address?: string) {
     /** If device never showed up, bail */
     if (!bluetoothDevices[address]) return
     stopScanning()
+  } else if (isSerialPath(address)) {
+    /** Serial Device */
+    connection = new NodeSerialConnection()
   } else {
     /** HTTP Endpoint */
     connection = new HttpConnection()
@@ -481,10 +486,12 @@ export async function connect(address?: string) {
   })
 
   // Attempt to connect to the specified MeshTastic Node
-  console.log('[meshtastic] Connecting to Node', address, connection instanceof BleConnection ? 'via Bluetooth' : 'via IP')
+  console.log('[meshtastic] Connecting to Node', address, connection instanceof BleConnection ? 'via Bluetooth' : connection instanceof NodeSerialConnection ? 'via Serial' : 'via IP')
   if (connection instanceof BleConnection) {
     // console.log(bluetoothDevices[address])
     await connection.connect({ device: bluetoothDevices[address] })
+  } else if (connection instanceof NodeSerialConnection) {
+    await connection.connect({ path: address })
   } else {
     process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0'
     await connection.connect({ address, fetchInterval: 2000, tls: enableTLS.value })
