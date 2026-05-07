@@ -19,6 +19,7 @@ import {
   enableTLS,
   lastFromRadio,
   meshMapForwarding,
+  messageHistory,
   messagePrefix,
   messageSuffix,
   myNodeMetadata,
@@ -235,6 +236,11 @@ export async function connect(address?: string) {
   channels.set([])
   updateTimeout()
 
+  // Load persisted message history into packets
+  if (messageHistory.value?.length) {
+    for (let msg of messageHistory.value) packets.upsert(msg)
+  }
+
   //   DeviceRestarting = 1,
   //   DeviceDisconnected = 2,
   //   DeviceConnecting = 3,
@@ -331,11 +337,13 @@ export async function connect(address?: string) {
   })
 
   /** TEXT_MESSAGE_APP */
+  /** TEXT_MESSAGE_APP */
   connection.events.onMessagePacket.subscribe((e) => {
     let message = copy(e)
     message.show = true
     let packet: MeshPacket
     packet = packets.upsert({ id: message.id, message })
+    messageHistory.upsert(packet)
     let node = getNodeById(packet.from)
     if (packet?.viaMqtt === false) sendToMeshMap({ num: message.from }, node, packet)
   })
